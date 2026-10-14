@@ -2,10 +2,13 @@
 
 const T = require('./tiles');
 
+/* 中发白和春夏秋冬梅兰竹菊一样属于「硬花牌」：摸到即自动补花，从墙尾补一张，
+   不可打出、不可碰、不可杠。所以 ALL_TILE_IDS 排除 z5-z7 ── 听口不会算它们。
+   物理上还在牌墙里（4×3=12 张），只是被替换到玩家的花区而已。 */
 const ALL_TILE_IDS = (function () {
   const ids = [];
   ['m', 's', 'p'].forEach(function (s) { for (let n = 1; n <= 9; n++) ids.push(s + n); });
-  for (let i = 1; i <= 7; i++) ids.push('z' + i);
+  for (let i = 1; i <= 4; i++) ids.push('z' + i);
   return ids;
 })();
 
@@ -247,7 +250,9 @@ function computeResult(player, winTile, ctx) {
   return best;
 }
 
-/* 计算听牌张（仅结构性判断，不校验门槛） */
+/* 计算听牌张：结构上成牌 + 满足起胡门槛（与 canWinWith 同一口径）。
+   只做结构判断会显示"听某牌"却胡不了（小胡没门清且硬花<4），玩家会困惑。
+   先做轻量的结构判断过滤，少数候选再走 computeResult 校验门槛，避免 144 次重算 */
 function waitingTiles(player) {
   const res = [];
   if (player.hand.length % 3 !== 1) return res;
@@ -255,8 +260,13 @@ function waitingTiles(player) {
     const t = ALL_TILE_IDS[i];
     player.hand.push(t);
     const a = analyzeWin(player.hand, player.melds);
+    let ok = false;
+    if (a) {
+      const r = computeResult(player, t, {});
+      ok = !!(r && r.pass);
+    }
     player.hand.pop();
-    if (a) res.push(t);
+    if (ok) res.push(t);
   }
   return res;
 }
@@ -329,7 +339,7 @@ Game.prototype.flowerReplace = function (seat) {
   const p = this.players[seat];
   for (;;) {
     let idx = -1;
-    for (let i = 0; i < p.hand.length; i++) if (T.isFlower(p.hand[i])) { idx = i; break; }
+    for (let i = 0; i < p.hand.length; i++) if (T.isHardFlower(p.hand[i])) { idx = i; break; }
     if (idx < 0) break;
     const t = p.hand.splice(idx, 1)[0];
     p.flowers.push(t);
@@ -347,7 +357,7 @@ Game.prototype.drawTile = function (fromEnd) {
 
 Game.prototype.drawWithFlowers = function (seat, fromEnd) {
   let t = this.drawTile(fromEnd);
-  while (t !== undefined && T.isFlower(t)) {
+  while (t !== undefined && T.isHardFlower(t)) {
     const p = this.players[seat];
     p.flowers.push(t);
     this.addLog(p.name + ' 补花 ' + T.tileLabel(t));

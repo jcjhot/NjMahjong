@@ -399,11 +399,14 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .meld { display: flex; gap: 1px; padding: 1px; border-radius: 4px; background: rgba(255, 255, 255, .09); }
 .meld.col { flex-direction: column; }
 .meld.anon { background: rgba(255, 255, 255, .06); }
-.flowers-row { display: flex; flex-wrap: wrap; gap: 2px; justify-content: center; }
-.flower-chip {
-  font-size: 10px; color: var(--gold);
-  border: 1px solid rgba(232, 196, 106, .45);
-  border-radius: 3px; padding: 0 3px; line-height: 14px;
+/* 花区：中发白与花牌并排的小牌面，金色描边标出「这些都是硬花」 */
+.flowers-row { display: flex; flex-wrap: wrap; gap: 2px; justify-content: center; align-items: center; }
+.flowers-row .lb { font-size: 10px; color: var(--ink-dim); margin-right: 1px; }
+.flowers-row .tile.flower {
+  --w: 14px; --r: 2.5px;
+  box-shadow: inset 0 0 0 1px rgba(58, 46, 28, .58),
+    0 0 0 1px rgba(232, 196, 106, .55),
+    0 1px 2px rgba(0, 0, 0, .38);
 }
 .waiting-bar { font-size: 11px; color: var(--gold); display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .waiting-bar .lb { color: var(--ink-dim); }

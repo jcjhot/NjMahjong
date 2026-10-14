@@ -66,6 +66,20 @@ const p7 = { hand: s('m1 m2 m3 m4 m5 m6 m7 m8 m9 s1 s1 s1 p2'), melds: [], flowe
 const w7 = M.waitingTiles(p7);
 ok('听 p2', w7.indexOf('p2') >= 0, '听 ' + w7.join(','));
 
+console.log('== 中发白 = 硬花牌 ==');
+(function () {
+  const g2 = new M.Game([{ name: 'A', isBot: true }, { name: 'B', isBot: true }, { name: 'C', isBot: true }, { name: 'D', isBot: true }]);
+  let inHand = 0, inFlowers = 0;
+  g2.players.forEach(p => {
+    p.hand.forEach(t => { if (T.isArrow(t)) inHand++; });
+    p.flowers.forEach(t => { if (T.isArrow(t)) inFlowers++; });
+  });
+  ok('发牌后手牌无中发白', inHand === 0, '花区 ' + inFlowers + ' 张');
+  const p8 = { hand: s('m1 m2 m3 m4 m5 m6 m7 m8 m9 s1 s1 s1 p2'), melds: [], flowers: [] };
+  const w8 = M.waitingTiles(p8);
+  ok('听牌不含中发白', w8.every(t => !T.isArrow(t)), '听 ' + w8.join(','));
+})();
+
 console.log('\n== 全局模拟 ==');
 const BOT = require('./bot');
 function botAct(g) {
@@ -94,6 +108,12 @@ function checkTiles(g) {
   T.buildWall().forEach(t => b[t] = (b[t] || 0) + 1);
   if (seen.length !== 144) return '总数 ' + seen.length;
   for (const k in b) if ((a[k] || 0) !== b[k]) return k + ' ' + (a[k] || 0) + '/' + b[k];
+  /* 回归：中发白是硬花牌，只允许出现在花区和牌墙，绝不进手牌 / 牌河 / 副露 */
+  for (const p of g.players) {
+    for (const t of p.hand) if (T.isArrow(t)) return '箭牌 ' + t + ' 出现在手牌';
+    for (const t of p.discards) if (T.isArrow(t)) return '箭牌 ' + t + ' 出现在牌河';
+    for (const m of p.melds) for (const t of m.tiles) if (T.isArrow(t)) return '箭牌 ' + t + ' 出现在副露';
+  }
   return null;
 }
 

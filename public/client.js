@@ -217,9 +217,10 @@ function renderSeat(s, mySeat) {
     return;
   }
 
+  /* 花区：中发白 + 春夏秋冬梅兰竹菊，全部用小牌面展示，硬花一目了然 */
   if (p.flowers && p.flowers.length) {
-    html += '<div class="flowers-row">' + p.flowers.map(function (t) {
-      return '<span class="flower-chip">' + label(t) + '</span>';
+    html += '<div class="flowers-row"><span class="lb">花</span>' + p.flowers.map(function (t) {
+      return tileHTML(t, 'mini flower');
     }).join('') + '</div>';
   }
 
@@ -390,7 +391,7 @@ function renderOverlay() {
     body += '<div class="result-tiles">' + tiles + melds + '</div>';
     body += '<div class="hu-line">' + res.total + ' 花</div>';
     body += '<div class="sub">硬花 ' + res.hard + ' + 软花 ' + res.soft + ' → ×2，另加基础 20 花' +
-      (res.bonus ? '，大胡 +' + res.bonus : '') + (res.extra ? '，附加 +' + res.extra : '') + '</div>';
+      (res.bonus ? '，门清/大胡加分 +' + res.bonus : '') + (res.extra ? '，附加 +' + res.extra : '') + '</div>';
     body += '<div class="pattern-list">' + res.labels.map(function (l) { return '<span>' + esc(l) + '</span>'; }).join('') + '</div>';
   } else {
     body += '<h2>荒庄</h2><div class="sub">牌墙摸完，本局无人胡牌</div>';
