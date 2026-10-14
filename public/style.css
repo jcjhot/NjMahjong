@@ -1,0 +1,640 @@
+:root {
+  --felt: #14513f;
+  --felt-dark: #0e3d2f;
+  --panel: rgba(0, 0, 0, .22);
+  --panel-line: rgba(255, 255, 255, .12);
+  --ink: #f2f7f4;
+  --ink-dim: #a9c4b9;
+  --ivory: #fbf7ee;
+  --ivory-edge: #d9cfb9;
+  --gold: #e8c46a;
+  --danger: #d9534f;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  background: var(--felt);
+  color: var(--ink);
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+/* 手机上地址栏会伸缩，100% 会按"缩起来"的视口算，dvh 才跟当前可视高度一致 */
+@supports (height: 100dvh) {
+  html, body { height: 100dvh; }
+}
+
+.hidden { display: none !important; }
+
+/* ---------------- 大厅 ---------------- */
+
+#lobby {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: radial-gradient(circle at 50% 0%, #1a6149 0%, var(--felt) 55%, var(--felt-dark) 100%);
+}
+
+.lobby-card {
+  width: 100%;
+  max-width: 380px;
+  background: rgba(0, 0, 0, .26);
+  border: 1px solid var(--panel-line);
+  border-radius: 20px;
+  padding: 28px 26px;
+  backdrop-filter: blur(6px);
+}
+
+.logo {
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: 4px;
+  text-align: center;
+  color: #fff;
+}
+
+.tagline {
+  text-align: center;
+  font-size: 12px;
+  color: var(--ink-dim);
+  margin: 8px 0 24px;
+  letter-spacing: .5px;
+}
+
+.field { display: block; margin-bottom: 14px; }
+.field span { display: block; font-size: 12px; color: var(--ink-dim); margin-bottom: 6px; }
+
+.field input {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 16px;
+  border-radius: 10px;
+  border: 1px solid var(--panel-line);
+  background: rgba(0, 0, 0, .28);
+  color: #fff;
+  outline: none;
+  font-family: inherit;
+}
+.field input:focus { border-color: var(--gold); }
+.field input::placeholder { color: rgba(255, 255, 255, .34); }
+
+button {
+  font-family: inherit;
+  font-size: 15px;
+  padding: 11px 18px;
+  border-radius: 10px;
+  border: 1px solid var(--panel-line);
+  background: rgba(255, 255, 255, .1);
+  color: #fff;
+  cursor: pointer;
+  transition: transform .08s, background .15s;
+}
+button:active { transform: scale(.97); }
+button.primary {
+  width: 100%;
+  background: var(--gold);
+  border-color: var(--gold);
+  color: #2a1e00;
+  font-weight: 600;
+  font-size: 16px;
+  padding: 13px;
+}
+button.ghost { background: rgba(255, 255, 255, .08); }
+button.small { font-size: 12px; padding: 6px 10px; }
+button.hot {
+  background: var(--danger);
+  border-color: var(--danger);
+  font-weight: 600;
+  color: #fff;
+}
+button.gold {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: #2a1e00;
+  font-weight: 600;
+}
+button:disabled { opacity: .4; cursor: not-allowed; }
+
+.hint { font-size: 12px; color: #ffd98a; min-height: 16px; margin-top: 10px; text-align: center; }
+
+.rules {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--panel-line);
+  font-size: 12px;
+  line-height: 1.85;
+  color: var(--ink-dim);
+}
+.rules b { color: var(--ink); }
+
+/* ---------------- 牌桌 ---------------- */
+
+#game {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  /* 避开 iPhone 刘海 / 底部横条 / 横屏圆角；盒模型是 border-box，加了内边距不会撑高 */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+#topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 14px;
+  background: rgba(0, 0, 0, .2);
+  border-bottom: 1px solid var(--panel-line);
+  font-size: 12px;
+  flex: 0 0 auto;
+}
+.room-tag b { color: var(--gold); letter-spacing: 2px; font-size: 14px; }
+.round-tag { margin-left: 12px; color: var(--ink-dim); }
+.wall-tag { color: var(--ink-dim); margin-right: 10px; }
+.tb-left, .tb-right { display: flex; align-items: center; }
+
+#board {
+  /* 中央牌河边长：跟着窗口高度走（窗口高去掉顶栏/操作栏和上下两家的高度），
+     上下限各自兜住小窗口与超长屏。四家的位置都由它撑开，改这一个值即可整体放大中央区。
+     外层 min 是宽度兜底：牌池现在是"高度定尺寸 + aspect-ratio 保正方"，
+     只按高度算出来的正方形有可能比中间那列还宽，窄屏上会横向顶出去 */
+  --pool: min(clamp(250px, calc(100vh - 360px), 660px), calc(100vw - 200px));
+  flex: 1 1 auto;
+  display: grid;
+  /* 左右两列用 1fr 而不是固定上限：上下两家跨三列，只有轨道铺满宽度，
+     它们（尤其底部 14 张手牌）才能吃满一整行。之前用 --side 给列加上限 +
+     justify-content: center，网格内容宽度只剩 --side*2 + --pool，
+     横屏时底部手牌被挤成两行、白白吃掉 80px 高度，把中央牌河顶到失真 */
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--pool)) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "top  top  top"
+    "left pool right"
+    "bot  bot  bot";
+  gap: 8px;
+  padding: 8px 10px 0;
+  min-height: 0;
+}
+
+#seat-top { grid-area: top; justify-self: center; align-self: end; width: fit-content; max-width: 100%; }
+/* 左右两家贴到自己那一侧，靠 margin 跟屏幕边缘留出距离（宽屏上不至于被甩到两个角落） */
+#seat-left {
+  grid-area: left; justify-self: start; align-self: center; max-height: 100%;
+  margin-left: clamp(0px, 5vw, 100px);
+}
+#seat-right {
+  grid-area: right; justify-self: end; align-self: center; max-height: 100%;
+  margin-right: clamp(0px, 5vw, 100px);
+}
+#seat-bottom { grid-area: bot; justify-self: center; align-self: start; width: fit-content; max-width: 100%; }
+
+/* ---------------- 中央牌河 ---------------- */
+
+/* 四家打出的牌全部收拢到桌子中间，围着中心堆成四块 */
+#pool {
+  grid-area: pool;
+  place-self: center;
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  grid-template-rows: 1fr auto 1fr;
+  gap: 6px;
+  /* 只给高度、宽度由 aspect-ratio 推出来，保证永远是正方形：
+     一开始写成 width/height 各自 min(100%, var(--pool))，高度被中间那行卡住时
+     宽度还是满的，牌河就成了扁的，上下两块牌河只剩十几像素、直接溢出 */
+  height: min(100%, var(--pool));
+  width: auto;
+  aspect-ratio: 1;
+  /* 牌河堆到四五层时兜住溢出，宁可裁掉也不要糊到上下两家身上 */
+  overflow: hidden;
+}
+#pool::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, rgba(0, 0, 0, .22), rgba(0, 0, 0, .10) 46%, rgba(0, 0, 0, 0) 72%);
+  pointer-events: none;
+}
+
+.river { display: flex; gap: 1px; }
+.river-row { display: flex; gap: 1px; }
+
+/* 四块牌河紧贴中心：每家的第一行离自己最近，往后每一行堆向中心 */
+#river-top    { grid-area: 1 / 2; justify-self: center; align-self: end;    flex-direction: column; }
+#river-bottom { grid-area: 3 / 2; justify-self: center; align-self: start;  flex-direction: column-reverse; }
+#river-left   { grid-area: 2 / 1; justify-self: end;    align-self: center; flex-direction: row; }
+#river-right  { grid-area: 2 / 3; justify-self: start;  align-self: center; flex-direction: row-reverse; }
+
+/* 每行/列内部的排序方向，保证牌面朝向打牌的人 */
+#river-top .river-row { flex-direction: row-reverse; }
+#river-bottom .river-row { flex-direction: row; }
+#river-left .river-row { flex-direction: column-reverse; }
+#river-right .river-row { flex-direction: column; }
+
+.seat-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 5px 7px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, .13);
+  border: 1px solid transparent;
+  transition: border-color .2s, background .2s;
+  overflow: hidden;
+}
+.seat-box.active {
+  border-color: var(--gold);
+  background: rgba(232, 196, 106, .13);
+}
+.seat-box.winner { border-color: #7fe0a8; background: rgba(127, 224, 168, .16); }
+
+.seat-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.seat-name .nm { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.seat-name .wind {
+  width: 17px; height: 17px; border-radius: 4px;
+  background: rgba(255, 255, 255, .16);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: var(--gold); flex: 0 0 auto;
+}
+.seat-name .sc { margin-left: auto; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.seat-name .sc.up { color: #7fe0a8; }
+.seat-name .sc.down { color: #ff9b96; }
+.seat-name .zz {
+  font-size: 10px; padding: 1px 4px; border-radius: 3px;
+  background: var(--gold); color: #2a1e00; font-weight: 600;
+}
+.seat-name .off { font-size: 10px; color: #ff9b96; }
+.seat-name .bot { font-size: 10px; color: var(--ink-dim); }
+
+/* ---------------- 牌 ---------------- */
+/* 外层 span 定尺寸并承载动画，内层 img 只负责画面 —— 这样横放的牌可以在不动布局的前提下旋转 */
+
+.tile {
+  --w: 26px;
+  --r: 4px;
+  width: var(--w);
+  height: calc(var(--w) * 1.4);
+  display: inline-block;
+  flex: 0 0 auto;
+  position: relative;
+  user-select: none;
+  line-height: 0;
+  /* 牌身：浅色底 + 一圈内描边。
+     素材本身只有透明底的牌面花纹，不铺底就跟桌面糊在一起，这里给每张牌补出实体感 */
+  background: linear-gradient(180deg, #fffdf6 0%, #f1e9d8 100%);
+  border-radius: var(--r);
+  box-shadow:
+    inset 0 0 0 1px rgba(58, 46, 28, .58),
+    inset 0 -1px 0 rgba(58, 46, 28, .22),
+    0 1px 2px rgba(0, 0, 0, .38);
+}
+.tile > img {
+  width: 100%; height: 100%; display: block;
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+/* 白板（白皮）：素材里它就是一张全空白的牌，只剩牌身底色，
+   铺到牌河里看不出"这是一张"。补一圈凹刻内框 —— 既是真白板的样子，也让它一眼可辨。
+   线宽跟着牌尺寸走（手牌约 2.8px、牌河约 1.3px），mini 那种小牌兜底 1px 不至于糊掉。
+   用 ::after 叠在牌面之上，不占布局，横放的牌跟着 tile 一起转，比例自动对上 */
+.tile.k-z7::after {
+  content: '';
+  position: absolute;
+  inset: 10%;
+  border: max(1px, calc(var(--w) * 0.055)) solid rgba(38, 68, 120, .66);
+  border-radius: calc(var(--r) * 0.75);
+  box-shadow: inset 0 0 0 max(1px, calc(var(--w) * 0.022)) rgba(255, 255, 255, .55);
+  pointer-events: none;
+}
+
+/* 对家：牌面倒过来 */
+.tile.rot180 > img { transform: rotate(180deg); }
+
+/* 左右两家：横向摆放。外层换成横的尺寸并把内层转到相应朝向 */
+.tile.flat-cw,
+.tile.flat-ccw {
+  width: calc(var(--w) * 1.4);
+  height: var(--w);
+}
+.tile.flat-cw > img,
+.tile.flat-ccw > img {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: var(--w);
+  height: calc(var(--w) * 1.4);
+  transform-origin: center;
+}
+.tile.flat-cw > img { transform: translate(-50%, -50%) rotate(90deg); }
+.tile.flat-ccw > img { transform: translate(-50%, -50%) rotate(-90deg); }
+
+.tile.small { --w: 20px; --r: 3px; }
+.tile.mini { --w: 17px; --r: 3px; }
+.tile.hand { --w: clamp(30px, 3.6vw, 56px); --r: 6px; }
+/* 牌河里的牌：比副露略大，堆砌成块 */
+.tile.river-tile { --w: clamp(18px, 1.9vw, 28px); --r: 4px; }
+.tile.hand.pickable { cursor: pointer; }
+.tile.hand.pickable:hover { transform: translateY(-8px); }
+.tile.sel { transform: translateY(-8px); }
+/* 刚摸进来的那张：跟理好的手牌之间空开一段，一眼就能看出摸到什么 */
+.tile.drawn { margin-left: 16px; }
+.tile.newdiscard { outline: 2px solid var(--gold); outline-offset: 1px; }
+.tile.dim { opacity: .38; }
+
+/* ---------------- 摸牌 / 打牌 动效 ---------------- */
+
+/* 摸进来 / 碰出来的牌：金色光晕扫一圈 */
+@keyframes fxGlow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(232, 196, 106, .95), 0 0 0 0 rgba(232, 196, 106, .5),
+      0 1.5px 0 rgba(120, 105, 75, .55);
+  }
+  100% {
+    box-shadow: 0 0 0 9px rgba(232, 196, 106, 0), 0 0 0 17px rgba(232, 196, 106, 0),
+      0 1.5px 0 rgba(120, 105, 75, .55);
+  }
+}
+.tile.fx-glow, .meld.fx-glow { animation: fxGlow .8s ease-out; }
+
+/* 牌墙剩余数：有人摸牌时跳一下 */
+@keyframes fxPulse {
+  0% { transform: scale(1); color: var(--gold); }
+  38% { transform: scale(1.24); color: #fff4d2; }
+  100% { transform: scale(1); color: var(--gold); }
+}
+.center-core .big.fx-pulse { animation: fxPulse .6s ease-out; }
+
+/* 轮到谁：座位框呼吸 */
+@keyframes seatBreath {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(232, 196, 106, 0); }
+  50% { box-shadow: 0 0 0 3px rgba(232, 196, 106, .26); }
+}
+.seat-box.active { animation: seatBreath 1.8s ease-in-out infinite; }
+
+.rowsep { display: flex; flex-wrap: wrap; gap: 2px; align-items: flex-end; }
+
+/* ---------------- 各座位内容 ---------------- */
+
+.backs { display: flex; flex-wrap: wrap; gap: 2px; justify-content: center; }
+.backs.col { flex-direction: column; align-items: center; flex-wrap: nowrap; }
+.melds { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.melds.col { flex-direction: column; align-items: center; flex-wrap: nowrap; gap: 5px; }
+.meld { display: flex; gap: 1px; padding: 1px; border-radius: 4px; background: rgba(255, 255, 255, .09); }
+.meld.col { flex-direction: column; }
+.meld.anon { background: rgba(255, 255, 255, .06); }
+.flowers-row { display: flex; flex-wrap: wrap; gap: 2px; justify-content: center; }
+.flower-chip {
+  font-size: 10px; color: var(--gold);
+  border: 1px solid rgba(232, 196, 106, .45);
+  border-radius: 3px; padding: 0 3px; line-height: 14px;
+}
+.waiting-bar { font-size: 11px; color: var(--gold); display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.waiting-bar .lb { color: var(--ink-dim); }
+
+#seat-bottom { gap: 6px; }
+#seat-bottom .my-hand { display: flex; flex-wrap: wrap; gap: 4px; align-items: flex-end; justify-content: center; }
+
+/* ---------------- 中央 ---------------- */
+
+#center {
+  grid-area: 2 / 2;
+  align-self: center;
+  justify-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 174px;
+  overflow: hidden;
+  pointer-events: none;
+}
+.center-core {
+  width: 112px; height: 112px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, .26);
+  border: 1px solid var(--panel-line);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  text-align: center;
+}
+.center-core .big { font-size: 24px; font-weight: 600; color: var(--gold); font-variant-numeric: tabular-nums; }
+.center-core .lb { font-size: 11px; color: var(--ink-dim); }
+.turn-name { font-size: 12px; color: var(--ink); }
+.turn-name b { color: var(--gold); }
+
+#log {
+  font-size: 10px;
+  color: var(--ink-dim);
+  line-height: 1.6;
+  max-height: 52px;
+  overflow: hidden;
+  text-align: center;
+  max-width: 100%;
+}
+
+/* ---------------- 操作栏 ---------------- */
+
+#actionbar {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 10px 12px 14px;
+  background: rgba(0, 0, 0, .22);
+  border-top: 1px solid var(--panel-line);
+  min-height: 58px;
+}
+.action-tip { font-size: 13px; color: var(--ink-dim); }
+.action-tip b { color: var(--gold); }
+
+/* 太矮的横屏（手机横过来 ≈390px 高）：中央"回"字牌河光两侧就要 270px 见方，
+   这个高度无论如何塞不下，与其糊成一团不如直接引导转屏 */
+#rotate-hint {
+  display: none;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 14px;
+  line-height: 2.1;
+  color: var(--ink-dim);
+  padding: 20px;
+}
+#rotate-hint b { color: var(--gold); font-size: 17px; }
+
+/* ---------------- 结算 ---------------- */
+
+#overlay {
+  position: fixed; inset: 0;
+  background: rgba(4, 22, 17, .78);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px; z-index: 50;
+  backdrop-filter: blur(3px);
+}
+.result-card {
+  width: 100%; max-width: 400px;
+  background: #174f3f;
+  border: 1px solid var(--panel-line);
+  border-radius: 18px;
+  padding: 24px 22px;
+  text-align: center;
+  max-height: 88vh;
+  overflow: auto;
+}
+.result-card h2 { margin: 0 0 4px; font-size: 20px; }
+.result-card .sub { font-size: 12px; color: var(--ink-dim); margin-bottom: 16px; }
+.result-tiles { display: flex; justify-content: center; gap: 3px; margin: 12px 0; flex-wrap: wrap; }
+.pattern-list { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 14px 0; }
+.pattern-list span {
+  font-size: 12px; padding: 3px 9px; border-radius: 999px;
+  background: rgba(232, 196, 106, .18); color: var(--gold);
+  border: 1px solid rgba(232, 196, 106, .35);
+}
+.score-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 12px 0 18px; }
+.score-table td { padding: 7px 4px; border-bottom: 1px solid var(--panel-line); text-align: left; }
+.score-table td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.score-table .up { color: #7fe0a8; }
+.score-table .down { color: #ff9b96; }
+.hu-line { font-size: 22px; font-weight: 600; color: var(--gold); margin: 6px 0; }
+
+#toast {
+  position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+  background: rgba(0, 0, 0, .82); color: #fff;
+  font-size: 13px; padding: 9px 16px; border-radius: 8px;
+  opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 90;
+  max-width: calc(100vw - 32px);
+}
+#toast.show { opacity: 1; }
+
+/* ---------------- 窄屏 ---------------- */
+
+@media (max-width: 760px) {
+  #board {
+    /* 竖屏的稀缺资源是宽度，但要精打细算：
+       牌池两侧的列只需要放左右两家（一张横放的牌背 20px + 内边距 ≈ 36px），
+       给到 68px 连"电脑4"这种名字都不会被截断；剩下的宽度全给牌池，
+       390 宽的屏上牌池能到 240（原来写死 214，白饶 26px 给空的）。
+       牌池边长直接决定左右两块牌河能堆几层：240 → 每侧 75px → 4 层 = 24 张 */
+    --pool: clamp(150px, calc(100vw - 150px), 254px);
+    padding: 4px;
+    gap: 3px;
+  }
+  /* 手牌放大：14 张在竖屏必然折成两行，两行就够用了，
+     不如把单张做大，手指点得准（30px → 37px 左右，触控面积接近 37×52） */
+  .tile.hand { --w: clamp(30px, 9.6vw, 44px); --r: 4px; }
+  .tile { --w: 20px; --r: 3px; }
+  .tile.small { --w: 16px; --r: 2px; }
+  .tile.mini { --w: 14px; --r: 2px; }
+  .tile.river-tile { --w: clamp(13px, 3.4vw, 17px); --r: 2px; }
+  .tile.drawn { margin-left: 10px; }
+  #pool { gap: 3px; }
+  /* #center 的宽度决定牌池中间那一列，也就决定了左右两块牌河能有多少宽度。
+     收到 84px 后 390 宽的屏上两侧各有 ~59px，够左右牌河竖排 3 层（18 张），
+     整局打完不溢出 */
+  #center { width: 84px; gap: 3px; }
+  .center-core { width: 58px; height: 58px; border-radius: 10px; }
+  .center-core .big { font-size: 16px; }
+  .center-core .lb { font-size: 9px; }
+  .turn-name { font-size: 10px; }
+  #log { display: none; }
+  .seat-box { padding: 3px 4px; gap: 2px; }
+  .seat-name { font-size: 10px; gap: 3px; }
+  .seat-name .nm { max-width: 40px; }
+  .seat-name .wind { width: 14px; height: 14px; font-size: 9px; }
+  #topbar { padding: 6px 10px; }
+  #actionbar { padding: 8px; min-height: 52px; }
+  button { padding: 10px 14px; font-size: 14px; }
+}
+
+/* ---------------- 矮屏：手机横屏 / 低分辨率窗口 ----------------
+   放在窄屏块之后，两者同时命中时以这里为准。
+
+   中央"回"字牌河本质上是 `1fr auto 1fr` 的两轴套娃：
+   牌池边长至少要 ≥ 中间核心 + 2×(牌河堆叠方向那一边的厚度)，
+   而且上下两块牌河往下/往上堆、左右两块往左/往右堆，两个方向都要留够。
+   高度富余时看不出问题，高度一紧就会顶破自己的网格行、压在上下两家身上。
+   这里的思路是三条：
+   1) 底部手牌务必一行放下（横屏宽度够，14 张 4.8vw 刚好一行）；
+      手牌折成两行会白吃 80px，是当时把中央挤爆的头号元凶；
+   2) 中央核心和牌河一起收小，把"核心 + 2×牌河"压进牌池；
+   3) 牌池用 height 定尺寸 + aspect-ratio 保持正方，只给高度就不会被压成扁的。
+   实测竖屏 390×844、矮窗口 900×500 都正常；
+   再矮（≤470px，手机横屏就是这个量级）就交给下面的转屏引导。 */
+@media (max-height: 700px) {
+  #board {
+    /* 210 的来历：顶栏 34 + 操作栏 40 + 牌桌内边距 4 + 上家 43 + 下家 76 + 行间距 10 ≈ 207，
+       取 210 留一点余量。底部手牌一行放得下时下家只有 ~76px，比折行时省 80px */
+    --pool: min(clamp(150px, calc(100vh - 210px), 520px), calc(100vw - 120px));
+    gap: 4px;
+    padding: 4px 8px 0;
+  }
+  #center { width: 96px; gap: 3px; }
+  .center-core { width: 68px; height: 68px; border-radius: 10px; gap: 2px; }
+  .center-core .big { font-size: 16px; }
+  .center-core .lb { font-size: 9px; }
+  .turn-name { font-size: 10px; }
+  #log { display: none; }
+  /* 中央核心一定要缩小：它决定了牌池中间那一"auto"行的最小高度 */
+  .tile { --w: 17px; --r: 3px; }
+  .tile.small { --w: 15px; --r: 2px; }
+  .tile.mini { --w: 11px; --r: 2px; }
+  /* 手牌尺寸不在这里定：矮屏又窄（360×640 小屏）应该用窄屏那套 9.6vw，
+     只有"宽而矮"（横屏/矮窗口）才该按 4.8vw 放一行，见下面单独一条 */
+  /* 牌河牌再收一档：左右两家的牌河是竖着的 6 张一列，它们的高度会撑高牌池中间那行 */
+  .tile.river-tile { --w: clamp(11px, 1.9vw, 18px); --r: 3px; }
+  .tile.drawn { margin-left: 12px; }
+  #pool { gap: 3px; }
+  .seat-box { padding: 3px 5px; gap: 2px; }
+  .seat-name { font-size: 10px; gap: 3px; }
+  .seat-name .nm { max-width: 54px; }
+  .seat-name .wind { width: 14px; height: 14px; font-size: 9px; }
+  #topbar { padding: 4px 10px; }
+  button.small { padding: 4px 8px; font-size: 11px; }
+  #actionbar { padding: 5px 8px 7px; min-height: 40px; }
+  button { padding: 8px 14px; font-size: 13px; }
+  #toast { bottom: calc(74px + env(safe-area-inset-bottom)); }
+}
+
+/* 宽而矮（手机横屏、矮窗口）：宽度富余，手牌按 4.8vw 刚好一行放得下 14 张。
+   窄屏（≤760px）不适用这条，那边保持 9.6vw 的大牌面 */
+@media (max-height: 700px) and (min-width: 761px) {
+  .tile.hand { --w: clamp(28px, 4.8vw, 46px); --r: 5px; }
+}
+
+/* 小屏上座位区只显示昵称就够了："电脑4" 已经说明了是机器人，
+   再挂一个"电脑"标签会把座位框撑宽、压到中央牌河上 */
+@media (max-width: 760px), (max-height: 700px) {
+  .seat-name .bot { display: none; }
+}
+
+/* 手机横过来只有 ~390px 高，"回"字牌河怎么缩都放不下（光中间核心 + 两侧牌河就要 270px 见方），
+   与其让牌河糊满整张桌子，不如直接引导用户转回竖屏 */
+@media (max-height: 470px) {
+  #topbar, #board, #actionbar { display: none; }
+  #rotate-hint { display: flex; }
+}

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>南京麻将 · 四人联机</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<div id="lobby">
+  <div class="lobby-card">
+    <div class="logo">南京麻将</div>
+    <div class="tagline">144 张 · 可碰可杠不可吃 · 论花算钱</div>
+    <label class="field">
+      <span>昵称</span>
+      <input id="nameInput" maxlength="8" placeholder="例如：老王">
+    </label>
+    <label class="field">
+      <span>房间号</span>
+      <input id="codeInput" maxlength="4" placeholder="留空则自动开新房">
+    </label>
+    <button id="joinBtn" class="primary">进入牌桌</button>
+    <div id="lobbyHint" class="hint"></div>
+    <div class="rules">
+      <b>快速了解</b>
+      只能碰、杠，<b>不能吃</b>；摸到花牌要补花；<br>
+      小胡必须<b>门清</b>或有 <b>4 张以上硬花</b>（中发白 + 花牌）；<br>
+      大胡（七对 / 清一色 / 碰碰胡 / 全球独钓）不受此限。
+    </div>
+  </div>
+</div>
+
+<div id="game" class="hidden">
+  <div id="topbar">
+    <div class="tb-left">
+      <span class="room-tag">房间 <b id="roomCode">----</b></span>
+      <span class="round-tag" id="roundTag"></span>
+    </div>
+    <div class="tb-right">
+      <span class="wall-tag" id="wallTag"></span>
+      <button id="copyBtn" class="ghost small">复制房间号</button>
+    </div>
+  </div>
+
+  <div id="board">
+    <div class="seat-box" id="seat-top"></div>
+    <div class="seat-box" id="seat-left"></div>
+    <div class="seat-box" id="seat-right"></div>
+    <div id="pool">
+      <div class="river" id="river-top"></div>
+      <div class="river" id="river-left"></div>
+      <div class="river" id="river-right"></div>
+      <div class="river" id="river-bottom"></div>
+      <div id="center"></div>
+    </div>
+    <div class="seat-box" id="seat-bottom"></div>
+  </div>
+
+  <div id="actionbar"></div>
+  <div id="rotate-hint">牌桌放不下这个高度<br><b>请把手机转成竖屏</b><br>（或用电脑把窗口拉高一点）</div>
+</div>
+
+<div id="overlay" class="hidden"></div>
+<div id="toast"></div>
+
+<script src="/tiles.js"></script>
+<script src="/client.js"></script>
+</body>
+</html>

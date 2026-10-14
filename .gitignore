@@ -1,0 +1,10 @@
+node_modules/
+*.log
+npm-debug.log*
+.DS_Store
+.env
+.env.local
+.workbuddy/
+.vscode/
+.idea/
+*.pid
