@@ -153,7 +153,7 @@ function buildView(room, seat) {
     log: g ? g.log.slice(-30) : [],
     me: me,
     seats: seatsInfo(room),
-    canStart: room.players.length >= 2 && (!g || g.phase === 'finished'),
+    canStart: room.players.length >= 1 && (!g || g.phase === 'finished'),
     roundStarted: !!g && g.roundNo > 0 && g.phase !== 'finished'
   };
 }
@@ -462,7 +462,8 @@ const server = http.createServer(function (req, res) {
       /* 检查所有真人是否都准备 */
       const humans = room.players.filter(function (p) { return p && !p.isBot; });
       const allReady = humans.length >= 1 && humans.every(function (p) { return p.ready; });
-      if (allReady && room.players.length >= 2 && (!room.game || room.game.phase === 'finished')) {
+      /* 单人也可以开局：人不满 4 自动补电脑，所以 >= 1 即可 */
+      if (allReady && room.players.length >= 1 && (!room.game || room.game.phase === 'finished')) {
         while (room.players.length < 4) {
           const i = room.players.length;
           room.players.push({ name: '电脑' + (i + 1), isBot: true, connected: true, token: 'bot' + i + room.code, thinking: false, ready: true });
