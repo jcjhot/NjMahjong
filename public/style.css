@@ -107,6 +107,7 @@ button.primary {
 }
 button.ghost { background: rgba(255, 255, 255, .08); }
 button.small { font-size: 12px; padding: 6px 10px; }
+button.icon { font-size: 16px; padding: 6px 8px; line-height: 1; min-width: 32px; }
 button.hot {
   background: var(--danger);
   border-color: var(--danger);

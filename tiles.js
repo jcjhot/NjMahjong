@@ -62,7 +62,7 @@
     const s = t[0];
     const n = numOf(t);
     if (SUIT_SUB[s]) return { main: s === 'm' ? NUM_CN[n - 1] : String(n), sub: SUIT_SUB[s], kind: s, idx: n };
-    if (HONOR_CHAR[t]) return { main: HONOR_CHAR[t], sub: '', kind: 'z', idx: n };
+    if (HONOR_CHAR[t]) return { main: HONOR_CHAR[t], sub: n <= 4 ? '风' : '', kind: 'z', idx: n };
     return { main: FLOWER_CHAR[t], sub: '', kind: 'f', idx: n };
   }
 

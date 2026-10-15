@@ -38,6 +38,182 @@ function backHTML(cls) {
     '<img src="' + tileURL('back') + '" alt="" draggable="false"></span>';
 }
 
+/* ---------------- 音频（Web Audio 合成，零外部资源）----------------
+   背景音乐用五声音阶随机漫步（中国风宫商角徵羽），出牌/碰/杠/胡/补花各一种合成音效。
+   AudioContext 必须在用户手势内创建（浏览器自动播放策略），所以首次 click 才 init。
+   muted 状态持久化 localStorage，刷新后保留。 */
+const AUDIO = (function () {
+  let ctx = null, master = null, bgmGain = null, sfxGain = null;
+  let bgmTimer = null;
+  let muted = false;
+  let inited = false;
+  /* C 调五声音阶（宫商角徵羽）跨两个八度 */
+  const PENTA = [261.63, 293.66, 329.63, 392.00, 440.00,
+                 523.25, 587.33, 659.25, 783.99, 880.00];
+
+  function ensureCtx() {
+    if (ctx) return ctx;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      ctx = new AC();
+      master = ctx.createGain();
+      master.gain.value = muted ? 0 : 1;
+      master.connect(ctx.destination);
+      bgmGain = ctx.createGain();
+      bgmGain.gain.value = 0.10;
+      bgmGain.connect(master);
+      sfxGain = ctx.createGain();
+      sfxGain.gain.value = 0.5;
+      sfxGain.connect(master);
+    } catch (e) { ctx = null; }
+    return ctx;
+  }
+
+  /* 合成一个带 envelope 的音 */
+  function blip(freq, dur, type, dest, opts) {
+    if (!ctx) return;
+    opts = opts || {};
+    const t0 = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.type = type || 'sine';
+    osc.frequency.setValueAtTime(freq, t0);
+    if (opts.glide) osc.frequency.exponentialRampToValueAtTime(opts.glide, t0 + dur);
+    const g = ctx.createGain();
+    const peak = opts.peak || 1;
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(peak, t0 + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    osc.connect(g);
+    g.connect(dest || sfxGain);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.02);
+  }
+
+  /* 白噪音 burst：做出"啪"的木质敲击感 */
+  function noiseBurst(dur, filterFreq, peak) {
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    const len = Math.floor(ctx.sampleRate * dur);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) {
+      const env = Math.exp(-i / len * 4);
+      data[i] = (Math.random() * 2 - 1) * env;
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = filterFreq || 1200;
+    const g = ctx.createGain();
+    g.gain.value = peak || 0.6;
+    src.connect(filter);
+    filter.connect(g);
+    g.connect(sfxGain);
+    src.start(t0);
+  }
+
+  function playSfx(type) {
+    if (muted) return;
+    if (!ensureCtx()) return;
+    if (ctx.state === 'suspended') ctx.resume();
+    switch (type) {
+      case 'discard':                      // 出牌：短促木质"啪"
+        noiseBurst(0.08, 1500, 0.45);
+        blip(180, 0.06, 'triangle', null, { peak: 0.3 });
+        break;
+      case 'draw':                         // 摸牌：轻敲
+        noiseBurst(0.05, 2000, 0.22);
+        break;
+      case 'pong':                         // 碰：两声叠加
+        noiseBurst(0.1, 1200, 0.5);
+        setTimeout(function () { blip(440, 0.12, 'triangle', null, { peak: 0.4 }); }, 30);
+        break;
+      case 'kong':                         // 杠：重击 + 低音
+        noiseBurst(0.14, 900, 0.65);
+        blip(110, 0.18, 'sawtooth', null, { peak: 0.4 });
+        break;
+      case 'hu':                           // 胡：上升清脆
+        blip(523, 0.1, 'triangle', null, { peak: 0.5 });
+        setTimeout(function () { blip(659, 0.1, 'triangle', null, { peak: 0.5 }); }, 90);
+        setTimeout(function () { blip(784, 0.2, 'triangle', null, { peak: 0.5 }); }, 180);
+        setTimeout(function () { blip(1047, 0.3, 'sine', null, { peak: 0.4 }); }, 280);
+        break;
+      case 'flower':                       // 补花：柔和"叮"
+        blip(880, 0.15, 'sine', null, { peak: 0.35, glide: 1320 });
+        break;
+    }
+  }
+
+  /* BGM：五声音阶随机漫步，每 0.45s 一个音 */
+  function bgmTick() {
+    if (!ctx || muted) return;
+    if (Math.random() < 0.8) {
+      const freq = PENTA[Math.floor(Math.random() * PENTA.length)];
+      blip(freq, 0.4, 'sine', bgmGain, { peak: 0.6 });
+      if (Math.random() < 0.3) blip(freq / 2, 0.6, 'sine', bgmGain, { peak: 0.3 });
+    }
+  }
+
+  function startBgm() {
+    if (!ensureCtx()) return;
+    if (muted || bgmTimer) return;
+    if (ctx.state === 'suspended') ctx.resume();
+    bgmTimer = setInterval(bgmTick, 450);
+  }
+
+  function stopBgm() {
+    if (bgmTimer) { clearInterval(bgmTimer); bgmTimer = null; }
+  }
+
+  function setMuted(m) {
+    muted = m;
+    try { localStorage.setItem('mj_muted', m ? '1' : '0'); } catch (e) {}
+    if (!ensureCtx()) return;
+    if (m) {
+      master.gain.setValueAtTime(master.gain.value, ctx.currentTime);
+      master.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.1);
+      stopBgm();
+    } else {
+      if (ctx.state === 'suspended') ctx.resume();
+      master.gain.setValueAtTime(master.gain.value, ctx.currentTime);
+      master.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.1);
+      startBgm();
+    }
+  }
+
+  function isMuted() { return muted; }
+
+  /* 语音播报：用浏览器自带 SpeechSynthesis 读中文，受 muted 开关统一控制 */
+  function speak(text) {
+    if (muted || !text) return;
+    if (!window.speechSynthesis) return;
+    try {
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'zh-CN';
+      u.rate = 1.1;
+      u.volume = 0.8;
+      window.speechSynthesis.speak(u);
+    } catch (e) { /* ignore */ }
+  }
+
+  /* 从 localStorage 恢复静音偏好 */
+  try { muted = localStorage.getItem('mj_muted') === '1'; } catch (e) {}
+
+  return {
+    playSfx: playSfx,
+    speak: speak,
+    startBgm: startBgm,
+    stopBgm: stopBgm,
+    setMuted: setMuted,
+    isMuted: isMuted,
+    ensureCtx: ensureCtx,
+    get inited() { return inited; },
+    set inited(v) { inited = v; }
+  };
+})();
+
 /* ---------------- 摸牌 / 打牌 的动态效果 ---------------- */
 
 /*
@@ -56,7 +232,8 @@ const FX = (function () {
         return {
           h: p.hand ? p.hand.length : (p.handCount || 0),
           d: (p.discards || []).length,
-          m: (p.melds || []).length
+          m: (p.melds || []).length,
+          f: (p.flowers || []).length
         };
       })
     };
@@ -138,6 +315,10 @@ const FX = (function () {
         const el = lastTile('#river-' + pos + ' .tile');
         const deg = RIVER_DEG[pos] || 0;
         if (el) queue.push({ el: el, from: seatPos(pos), rot: deg === 180 ? 12 : deg === 0 ? -12 : 0, dur: 440 });
+        AUDIO.playSfx('discard');
+        const discards = next.players[seat].discards || [];
+        const tile = discards[discards.length - 1];
+        if (tile) AUDIO.speak(label(tile));
       }
 
       /* 摸牌：手牌多出一张，从牌墙飞回这一家面前 */
@@ -147,12 +328,23 @@ const FX = (function () {
           : lastTile('#seat-' + pos + ' .backs .tile');
         if (el) { queue.push({ el: el, from: wall, rot: 0, dur: 380 }); pulse(el, 'fx-glow', 820); }
         pulse(document.querySelector('.center-core .big'), 'fx-pulse', 640);
+        AUDIO.playSfx('draw');
       }
 
-      /* 碰 / 杠：副露成型，从牌墙弹出 */
+      /* 碰 / 杠：副露成型，从牌墙弹出。melds 最后一个 tiles.length>=4 是杠，否则碰 */
       if (b.m > a.m) {
         const el = lastTile('#seat-' + pos + ' .meld');
         if (el) { queue.push({ el: el, from: wall, rot: 0, dur: 380 }); pulse(el, 'fx-glow', 820); }
+        const melds = next.players[seat].melds || [];
+        const last = melds[melds.length - 1];
+        const isKong = last && last.tiles && last.tiles.length >= 4;
+        AUDIO.playSfx(isKong ? 'kong' : 'pong');
+        AUDIO.speak(isKong ? '杠' : '碰');
+      }
+
+      /* 补花：花区多出牌 */
+      if (b.f > a.f) {
+        AUDIO.playSfx('flower');
       }
     }
 
@@ -376,6 +568,11 @@ function renderOverlay() {
   const key = state.roundNo + ':' + (r.kind === 'win' ? r.winInfo.seat + ':' + r.winInfo.tile + ':' + r.winInfo.selfDraw : 'draw');
   if (key === lastResultKey) return;
   lastResultKey = key;
+  if (r.kind === 'win') {
+    AUDIO.playSfx('hu');
+    const w = r.winInfo;
+    AUDIO.speak((w.selfDraw ? '自摸' : '胡牌') + ' ' + (state.players[w.seat].name || ''));
+  }
 
   let body = '';
   if (r.kind === 'win') {
@@ -447,6 +644,13 @@ async function doNext() {
 }
 
 document.addEventListener('click', function (e) {
+  /* 首次用户交互：创建 AudioContext 并启动 BGM（浏览器自动播放策略要求） */
+  if (!AUDIO.inited) {
+    AUDIO.inited = true;
+    AUDIO.ensureCtx();
+    if (!AUDIO.isMuted()) AUDIO.startBgm();
+  }
+
   const t = e.target.closest('.tile.hand.pickable');
   if (t) {
     /* 点出去立刻上手感：牌往牌河方向抽走，等服务端回包 */
@@ -540,5 +744,17 @@ $('copyBtn').addEventListener('click', function () {
   if (navigator.clipboard) navigator.clipboard.writeText(txt).then(function () { toast('房间号已复制：' + txt); });
   else toast('房间号：' + txt);
 });
+
+/* 静音按钮：切换 muted，同步图标；首次点击也顺带 init AudioContext */
+function updateMuteIcon() {
+  const btn = $('muteBtn');
+  if (btn) btn.textContent = AUDIO.isMuted() ? '🔇' : '🔊';
+}
+$('muteBtn').addEventListener('click', function () {
+  AUDIO.setMuted(!AUDIO.isMuted());
+  updateMuteIcon();
+  toast(AUDIO.isMuted() ? '已静音' : '声音已开');
+});
+updateMuteIcon();
 
 boot();
