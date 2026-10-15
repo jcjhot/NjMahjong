@@ -66,6 +66,14 @@ const AUDIO = (function () {
       sfxGain = ctx.createGain();
       sfxGain.gain.value = 0.5;
       sfxGain.connect(master);
+      /* iOS Safari unlock：播一个静音 buffer 激活 AudioContext，
+         否则后续不在用户手势内的 playSfx 全是哑的 */
+      const buf = ctx.createBuffer(1, 1, 22050);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      src.start(0);
+      if (ctx.state === 'suspended') ctx.resume();
     } catch (e) { ctx = null; }
     return ctx;
   }
