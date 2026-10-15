@@ -103,6 +103,7 @@ function buildView(room, seat) {
       isBot: rp ? rp.isBot : false,
       connected: rp ? rp.connected : false,
       seated: !!rp,
+      ready: rp ? !!rp.ready : false,
       score: gp ? gp.score : 0,
       handCount: gp ? gp.hand.length : 0,
       hand: gp && (i === seat || finished) ? gp.hand : null,
@@ -140,6 +141,11 @@ function buildView(room, seat) {
     turn: g ? g.turn : -1,
     dealer: g ? g.dealer : 0,
     roundNo: g ? g.roundNo : 0,
+    circleNo: g ? g.circleNo : 0,
+    roundInCircle: g ? g.roundInCircle : 0,
+    dealerStreak: g ? g.dealerStreak : 0,
+    gameOver: g ? !!g.gameOver : false,
+    totalCircles: g ? g.totalCircles : 4,
     wallCount: g ? g.wall.length : 0,
     players: players,
     lastDiscard: g ? g.lastDiscard : null,
@@ -252,7 +258,7 @@ function housekeeping() {
     room.idle = false;
     room.idleAt = 0;
 
-    if (g && g.phase === 'finished') {
+    if (g && g.phase === 'finished' && !g.gameOver) {
       if (!room.nextRoundAt) room.nextRoundAt = now + ROUND_AUTO_NEXT_MS;
       else if (now >= room.nextRoundAt) {
         room.nextRoundAt = 0;
@@ -285,7 +291,7 @@ function startRound(room, dealer) {
   } else {
     if (room.players.length < 4) {
       for (let i = room.players.length; i < 4; i++) {
-        room.players[i] = { name: '电脑' + (i + 1), isBot: true, connected: true, token: 'bot' + i + room.code };
+        room.players[i] = { name: '电脑' + (i + 1), isBot: true, connected: true, token: 'bot' + i + room.code, ready: true, thinking: false };
         room.game.players[i].name = room.players[i].name;
         room.game.players[i].isBot = true;
       }
@@ -365,7 +371,7 @@ const server = http.createServer(function (req, res) {
       if (room.players.length >= 4) return json(res, { error: '这个房间已经坐满了' }, 400);
       const token = crypto.randomBytes(12).toString('hex');
       const seat = room.players.length;
-      room.players.push({ name: name, isBot: false, connected: true, token: token, thinking: false });
+      room.players.push({ name: name, isBot: false, connected: true, token: token, thinking: false, ready: false });
       json(res, { token: token, seat: seat, code: room.code });
     });
   }
@@ -433,6 +439,41 @@ const server = http.createServer(function (req, res) {
     });
   }
 
+  /* 准备按钮：toggle ready，所有真人准备就自动开局 */
+  if (url.indexOf('/api/ready') === 0 && req.method === 'POST') {
+    return readBody(req, function (body) {
+      const token = body.token;
+      let room = null, seat = -1;
+      rooms.forEach(function (r) {
+        const i = r.players.findIndex(function (p) { return p.token === token; });
+        if (i >= 0) { room = r; seat = i; }
+      });
+      if (!room) return json(res, { error: '无效会话' }, 400);
+      /* 游戏进行中不能准备 */
+      if (room.game && room.game.phase === 'playing') return json(res, { error: '对局进行中' }, 400);
+      /* 游戏打满了（gameOver）允许重新准备 → 重置游戏 */
+      if (room.game && room.game.gameOver) {
+        room.game = null;
+        room.players.forEach(function (p) { if (p) { p.ready = false; p.score = 0; } });
+      }
+      const rp = room.players[seat];
+      if (!rp) return json(res, { error: '无效座位' }, 400);
+      rp.ready = !rp.ready;
+      /* 检查所有真人是否都准备 */
+      const humans = room.players.filter(function (p) { return p && !p.isBot; });
+      const allReady = humans.length >= 1 && humans.every(function (p) { return p.ready; });
+      if (allReady && room.players.length >= 2 && (!room.game || room.game.phase === 'finished')) {
+        while (room.players.length < 4) {
+          const i = room.players.length;
+          room.players.push({ name: '电脑' + (i + 1), isBot: true, connected: true, token: 'bot' + i + room.code, thinking: false, ready: true });
+        }
+        startRound(room, 0);
+      }
+      broadcast(room);
+      json(res, { ok: true, ready: rp.ready });
+    });
+  }
+
   if (url.indexOf('/api/start') === 0 && req.method === 'POST') {
     return readBody(req, function (body) {
       const token = body.token;
@@ -446,7 +487,7 @@ const server = http.createServer(function (req, res) {
       if (body.fillBots !== false) {
         while (room.players.length < 4) {
           const i = room.players.length;
-          room.players.push({ name: '电脑' + (i + 1), isBot: true, connected: true, token: 'bot' + i + room.code, thinking: false });
+          room.players.push({ name: '电脑' + (i + 1), isBot: true, connected: true, token: 'bot' + i + room.code, thinking: false, ready: true });
         }
       }
       if (room.players.length < 2) return json(res, { error: '至少需要 2 位玩家' }, 400);

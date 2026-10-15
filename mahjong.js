@@ -286,8 +286,14 @@ function Game(seats) {
       score: 0
     };
   });
-  this.dealer = 0;
+  this.dealer = -1;            /* -1 让首局 newRound(0) 判为换庄 */
   this.roundNo = 0;
+  this.dealerCount = 0;        /* 有多少个不同庄家打过（含连庄只算 1） */
+  this.circleNo = 0;           /* 第几圈 */
+  this.roundInCircle = 0;      /* 圈内第几局（1-4） */
+  this.dealerStreak = 0;       /* 连庄次数 */
+  this.totalCircles = 4;       /* 默认打 4 圈 */
+  this.gameOver = false;
   this.log = [];
   this.newRound(0);
 }
@@ -298,6 +304,29 @@ Game.prototype.addLog = function (text) {
 };
 
 Game.prototype.newRound = function (dealer) {
+  /* 圈数 / 连庄统计 */
+  if (dealer !== this.dealer) {
+    this.dealerStreak = 0;
+    this.dealerCount++;
+    this.circleNo = Math.floor((this.dealerCount - 1) / 4) + 1;
+    this.roundInCircle = ((this.dealerCount - 1) % 4) + 1;
+  } else {
+    this.dealerStreak++;
+  }
+  /* 打满 totalCircles 圈 → 游戏结束 */
+  if (this.circleNo > this.totalCircles) {
+    this.gameOver = true;
+    this.phase = 'finished';
+    this.result = {
+      kind: 'gameover',
+      text: '打满 ' + this.totalCircles + ' 圈，游戏结束',
+      winInfo: null,
+      nextDealer: null
+    };
+    this.addLog(this.result.text);
+    return;
+  }
+
   this.dealer = dealer;
   this.roundNo++;
   this.wall = T.shuffle(T.buildWall());
@@ -317,7 +346,7 @@ Game.prototype.newRound = function (dealer) {
     p.winTile = null;
   });
 
-  this.addLog('第 ' + this.roundNo + ' 局开始，' + this.players[dealer].name + ' 坐庄');
+  this.addLog('第' + this.circleNo + '圈第' + this.roundInCircle + '局，' + this.players[dealer].name + ' 坐庄' + (this.dealerStreak > 0 ? '（连' + (this.dealerStreak + 1) + '）' : ''));
 
   for (let r = 0; r < 13; r++) {
     for (let i = 0; i < 4; i++) {

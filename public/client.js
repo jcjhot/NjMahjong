@@ -373,7 +373,14 @@ function render() {
   const mySeat = me.seat;
 
   $('roomCode').textContent = state.code;
-  $('roundTag').textContent = state.roundNo ? '第 ' + state.roundNo + ' 局' : '等待开始';
+  if (state.gameOver) {
+    $('roundTag').textContent = '游戏结束';
+  } else if (state.roundNo) {
+    const streak = state.dealerStreak > 0 ? ' · 连' + (state.dealerStreak + 1) : '';
+    $('roundTag').textContent = '第' + state.circleNo + '圈 第' + state.roundInCircle + '局' + streak;
+  } else {
+    $('roundTag').textContent = '等待开始';
+  }
   $('wallTag').textContent = state.phase === 'lobby' ? '' : '剩余 ' + state.wallCount + ' 张';
 
   for (let s = 0; s < 4; s++) {
@@ -413,6 +420,8 @@ function renderSeat(s, mySeat) {
 
   if (state.phase === 'lobby') {
     if (!seated) html += '<div class="action-tip">空位</div>';
+    else if (p.ready) html += '<div class="action-tip ready-tag">已准备 ✓</div>';
+    else html += '<div class="action-tip">未准备</div>';
     box.innerHTML = html;
     return;
   }
@@ -526,9 +535,12 @@ function renderActions() {
 
   if (state.phase === 'lobby') {
     const n = state.players.filter(function (p) { return p.seated; }).length;
-    out.push('<span class="action-tip">已入座 <b>' + n + '/4</b>，其他人用房间号 <b>' + state.code + '</b> 加入</span>');
-    out.push('<button class="gold" data-act="start">开始对局</button>');
-    out.push('<span class="action-tip">不足 4 人将自动补电脑</span>');
+    const readyN = state.players.filter(function (p) { return p.ready; }).length;
+    const myReady = state.players[state.me.seat] && state.players[state.me.seat].ready;
+    out.push('<span class="action-tip">已入座 <b>' + n + '/4</b> · 已准备 <b>' + readyN + '/' + n + '</b></span>');
+    out.push('<button class="' + (myReady ? 'ghost' : 'gold') + '" data-act="ready">' + (myReady ? '已准备 ✓（取消）' : '准备') + '</button>');
+    if (n < 4) out.push('<span class="action-tip">不足 4 人将自动补电脑</span>');
+    else out.push('<span class="action-tip">全部准备后自动开局</span>');
     bar.innerHTML = out.join('');
     return;
   }
@@ -573,7 +585,7 @@ function renderOverlay() {
     lastResultKey = '';
     return;
   }
-  const key = state.roundNo + ':' + (r.kind === 'win' ? r.winInfo.seat + ':' + r.winInfo.tile + ':' + r.winInfo.selfDraw : 'draw');
+  const key = state.roundNo + ':' + (r.kind === 'win' ? r.winInfo.seat + ':' + r.winInfo.tile + ':' + r.winInfo.selfDraw : r.kind === 'gameover' ? 'gameover' : 'draw');
   if (key === lastResultKey) return;
   lastResultKey = key;
   if (r.kind === 'win') {
@@ -598,6 +610,8 @@ function renderOverlay() {
     body += '<div class="sub">硬花 ' + res.hard + ' + 软花 ' + res.soft + ' → ×2，另加基础 20 花' +
       (res.bonus ? '，门清/大胡加分 +' + res.bonus : '') + (res.extra ? '，附加 +' + res.extra : '') + '</div>';
     body += '<div class="pattern-list">' + res.labels.map(function (l) { return '<span>' + esc(l) + '</span>'; }).join('') + '</div>';
+  } else if (r.kind === 'gameover') {
+    body += '<h2>游戏结束</h2><div class="sub">打满 ' + state.totalCircles + ' 圈，最终成绩</div>';
   } else {
     body += '<h2>荒庄</h2><div class="sub">牌墙摸完，本局无人胡牌</div>';
   }
@@ -611,13 +625,18 @@ function renderOverlay() {
       '<td>总计 ' + p.score + '</td></tr>';
   }
   body += '</table>';
-  body += '<button class="gold" data-act="next">继续下一局</button>';
-  body += '<div class="sub" style="margin-top:10px">' + (r.dealerKeeps ? '庄家连庄' : '庄家换人') + '· 20 秒后自动开始</div>';
+  if (r.kind === 'gameover') {
+    body += '<button class="gold" data-act="ready">再来一局</button>';
+  } else {
+    body += '<button class="gold" data-act="next">继续下一局</button>';
+    body += '<div class="sub" style="margin-top:10px">' + (r.dealerKeeps ? '庄家连庄' : '庄家换人') + '· 20 秒后自动开始</div>';
+  }
 
   ov.innerHTML = '<div class="result-card">' + body + '</div>';
   ov.classList.remove('hidden');
   ov.onclick = function (e) {
     if (e.target.closest('[data-act="next"]')) doNext();
+    else if (e.target.closest('[data-act="ready"]')) doReady();
   };
 }
 
@@ -690,11 +709,16 @@ document.addEventListener('click', function (e) {
   else if (act === 'zimo') doAction({ type: 'zimo' });
   else if (act === 'next') doNext();
   else if (act === 'start') startGame();
+  else if (act === 'ready') doReady();
 });
 
 async function startGame() {
   const d = await post('/api/start', { token: token, fillBots: true });
   if (d.error) toast(d.error);
+}
+
+async function doReady() {
+  await post('/api/ready', { token: token });
 }
 
 function toast(msg) {

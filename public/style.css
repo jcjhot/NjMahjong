@@ -474,6 +474,7 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 }
 .action-tip { font-size: 13px; color: var(--ink-dim); }
 .action-tip b { color: var(--gold); }
+.ready-tag { color: var(--gold) !important; }
 
 /* 太矮的横屏（手机横过来 ≈390px 高）：中央"回"字牌河光两侧就要 270px 见方，
    这个高度无论如何塞不下，与其糊成一团不如直接引导转屏 */

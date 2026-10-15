@@ -119,6 +119,7 @@ function checkTiles(g) {
 
 const seats = [0, 1, 2, 3].map(i => ({ name: 'P' + i, isBot: true }));
 const g = new M.Game(seats);
+g.totalCircles = 100; /* 测试用：避免 300 局模拟被 4 圈上限打断 */
 let rounds = 0, wins = 0, draws = 0, tileErr = 0, handsErr = 0, pat = {};
 const t0 = Date.now();
 while (rounds < 300) {
