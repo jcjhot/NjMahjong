@@ -657,6 +657,16 @@ document.addEventListener('click', function (e) {
     AUDIO.inited = true;
     AUDIO.ensureCtx();
     if (!AUDIO.isMuted()) AUDIO.startBgm();
+    /* 激活 speechSynthesis：iOS/Android 都要求首次 speak 在用户手势内，
+       否则后续 SSE 推送触发的语音播报全部被静默阻止 */
+    if (window.speechSynthesis) {
+      try {
+        const u = new SpeechSynthesisUtterance(' ');
+        u.volume = 0;
+        u.lang = 'zh-CN';
+        window.speechSynthesis.speak(u);
+      } catch (e) {}
+    }
   }
 
   const t = e.target.closest('.tile.hand.pickable');
