@@ -13,8 +13,8 @@ const BOT = require('./bot');
 const PORT = Number(process.env.PORT || 8420);
 const ROOT = path.join(__dirname, 'public');
 const ROUND_AUTO_NEXT_MS = 20000;
-const BOT_DELAY = Number(process.env.BOT_DELAY || 750);
-const BOT_CLAIM_DELAY = Number(process.env.BOT_CLAIM_DELAY || 600);
+const BOT_DELAY = Number(process.env.BOT_DELAY || 1200);
+const BOT_CLAIM_DELAY = Number(process.env.BOT_CLAIM_DELAY || 800);
 /* 真人玩家超过该时长不出牌，由电脑托管代打，避免对局永久卡住；
    已经掉线的玩家只等 3 秒 */
 const TURN_TIMEOUT_MS = Number(process.env.TURN_TIMEOUT_MS || 20000);
